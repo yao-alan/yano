@@ -8,6 +8,7 @@
 #include <vector>
 #include <iostream>
 #include <unistd.h>
+#include <thread>
 
 #include "windowing.h"
 #include "xkeycodes.h"
@@ -26,9 +27,16 @@ namespace yano
             ~Yano();
             int run();
 
-            void keyHandler(xcb_keycode_t keycode);
+            void redraw() {
+                while (!m_window->shouldClose()) {
+                    m_window->display(0, 0, m_window->window_width, m_window->window_height);
+                    usleep(100000/m_refresh_rate);
+                }
+            }
+
         private:
             pw::Window                            *m_window;
+            uint8_t                                m_refresh_rate;
             uint8_t                                m_font_scale;
             std::vector<std::vector<std::string>>  m_glyphs;
             XToAscii                              *m_keycode_table;
@@ -42,6 +50,8 @@ namespace yano
 
             glyphProperties                        m_glyph_properties;
 
+            void keyHandler(xcb_keycode_t keycode);
+
             void drawGlyph(int row, int col, int scale, uint8_t keycode) {
                 int xoffset = scale * col * m_glyph_properties.global_bbox_w;
                 int yoffset = scale * row * m_glyph_properties.global_bbox_h;
@@ -54,23 +64,23 @@ namespace yano
                 // string of 0s and 1s
                 for (std::string &bitline : m_glyphs[keycode]) {
                     int p1 = p;
-                    for (int c = 0; c < bitline.size(); ++c) {
+                    for (int c = 0; c < (int)bitline.size(); ++c) {
                         int p2 = p;
                         if (bitline[c] == '1') {
                             for (int i = 0; i < scale; ++i) {
                                 for (int j = 0; j < scale; ++j) {
-                                    m_window->drawable[p+j*dp+0] = 255; // red
-                                    m_window->drawable[p+j*dp+1] = 255; // green
-                                    m_window->drawable[p+j*dp+2] = 255; // blue
+                                    m_window->drawable[p+j*dp+0] = 244; // red
+                                    m_window->drawable[p+j*dp+1] = 239; // green
+                                    m_window->drawable[p+j*dp+2] = 236; // blue
                                 }
                                 p += m_window->window_width*dp;
                             }
                         } else {
                             for (int i = 0; i < scale; ++i) {
                                 for (int j = 0; j < scale; ++j) {
-                                    m_window->drawable[p+j*dp+0] = 0;
-                                    m_window->drawable[p+j*dp+1] = 0;
-                                    m_window->drawable[p+j*dp+2] = 0;
+                                    m_window->drawable[p+j*dp+0] = 64; //172;
+                                    m_window->drawable[p+j*dp+1] = 52; //129;
+                                    m_window->drawable[p+j*dp+2] = 46; //94;
                                 }
                                 p += m_window->window_width*dp;
                             }
@@ -125,6 +135,26 @@ namespace yano
                         }
                     }
 
+                    void delChar() {
+                        // if iterator is at beginning of current line
+                        if (m_cursor_position.curr_col == m_cursor_position.curr_row->end()) {
+                            // can only delete if not at beginning of file
+                            if (m_cursor_position.curr_row != m_lines.begin()) {
+                                m_cursor_position.curr_row--;
+                                m_lines.erase(next(m_cursor_position.curr_row));
+                                // erase the '\n'
+                                m_cursor_position.curr_row->erase(prev(m_cursor_position.curr_row->end()));
+                                m_cursor_position.curr_col = prev(m_cursor_position.curr_row->end());
+                                m_cursor_position.row_coord--;
+                                m_cursor_position.col_coord = m_cursor_position.curr_row->size();
+                            }
+                        } else {
+                            m_cursor_position.curr_col--;
+                            m_cursor_position.curr_row->erase(next(m_cursor_position.curr_col));
+                            m_cursor_position.col_coord--;
+                        }
+                    }
+
                     std::list<std::list<char>> m_lines;
 
                     typedef struct CursorPosition {
@@ -148,8 +178,17 @@ yano::Yano::Yano(int16_t windowWidth,
                  uint8_t fontScale)
 {
     m_window = new pw::Window(windowWidth, windowHeight, "yano", -1);
+    m_refresh_rate = 60;
     m_font_scale = fontScale;
     m_keycode_table = new XToAscii();
+
+    // change background color
+    int bits_per_px = IMAGE_STORAGE_DEPTH >> 3;
+    for (int i = 0; i < windowWidth*windowHeight*bits_per_px; i += bits_per_px) {
+        m_window->drawable[i+0] = 64;
+        m_window->drawable[i+1] = 52;
+        m_window->drawable[i+2] = 46;
+    }
 
     // load glyphs
     std::string fontDir = "./config/.glyphs/" + font;
@@ -190,13 +229,24 @@ yano::Yano::~Yano() {
 
 int
 yano::Yano::run() {
+    std::thread render(&yano::Yano::redraw, this);
+
     while (!m_window->shouldClose()) {
         xcb_keycode_t keycode;
         m_window->pollEvents(&keycode);
         keyHandler(keycode);
+
+        // draw cursor
+        //drawGlyph(m_text_buffer.m_cursor_position.row_coord,
+        //            m_text_buffer.m_cursor_position.col_coord,
+        //            m_font_scale,
+        //            ascii_char);
+
         keycode = 0;
-        usleep(100000/6);
+        usleep(100000/m_refresh_rate);
     }
+
+    render.join();
 
     return 0;
 }
@@ -205,6 +255,15 @@ void
 yano::Yano::keyHandler(xcb_keycode_t keycode) {
     switch (keycode) {
         case 0: break;
+        // backspace
+        case BACKSPACE: {
+            m_text_buffer.delChar();
+            drawGlyph(m_text_buffer.m_cursor_position.row_coord,
+                      m_text_buffer.m_cursor_position.col_coord,
+                      m_font_scale,
+                      0); // draw over with a null char
+            break;
+        }
         default: {
             char ascii_char = m_keycode_table->convert(keycode, 0);
             m_text_buffer.addChar(ascii_char);
@@ -212,7 +271,6 @@ yano::Yano::keyHandler(xcb_keycode_t keycode) {
                       m_text_buffer.m_cursor_position.col_coord,
                       m_font_scale,
                       ascii_char);
-            m_window->display(0, 0, m_window->window_width, m_window->window_height);
             break;
         }
     }

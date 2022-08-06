@@ -5,23 +5,23 @@ import os
 
 FONT_FILE = 'boxxy.bdf'
 
+font_bbox = {
+    'width' : None,
+    'height': None,
+    'bl_x'  : None, # bottom-left x coordinate
+    'bl_y'  : None  # bottom-right y coordinate
+}
+current_encoding = None
+current_bbox = {
+    'width' : None,
+    'height': None,
+    'bl_x'  : None,
+    'bl_y'  : None
+}
+
 with open(f'./fonts/{FONT_FILE}') as f:
     if not os.path.exists(f'./.glyphs/{FONT_FILE.split(".")[0]}'):
         os.mkdir(f'./.glyphs/{FONT_FILE.split(".")[0]}')
-
-    font_bbox = {
-        'width' : None,
-        'height': None,
-        'bl_x'  : None, # bottom-left x coordinate
-        'bl_y'  : None  # bottom-right y coordinate
-    }
-    current_encoding = None
-    current_bbox = {
-        'width' : None,
-        'height': None,
-        'bl_x'  : None,
-        'bl_y'  : None
-    }
 
     for line in f:
         tokens = line.split()
@@ -52,3 +52,5 @@ with open(f'./fonts/{FONT_FILE}') as f:
                 gf.write(f'{bits}\n')
                 tokens = f.readline().split()
             gf.close()
+
+# generate cursor

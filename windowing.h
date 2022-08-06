@@ -19,10 +19,9 @@ const uint8_t IMAGE_STORAGE_DEPTH = 32;
     1. Instantiate with Window(width, height, title, display_num);
     2. Open a while(!shouldClose()) loop
     3. Add main logic into the loop, along with a pollEvents() call
-    4. Recommended two-part drawing procedure:
-        a. Write to window framebuffer by passing an array of Pixels
+    4. Two-part drawing procedure:
+        a. Directly draw to drawable
         b. Refresh on-screen image
-    5. Alternative: direct drawing with drawPixel(); not recommended if redrawing many pixels
 */
 
 namespace pw
