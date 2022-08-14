@@ -1,6 +1,6 @@
 # Yet Another NanO (yano)
 
-![Image of Yano Text Editor](Images/Yano.png)
+![Image of Yano Text Editor](images/Yano.png)
 
 Yano is a custom Linux text editor designed to be light on dependencies: only `XCB`, `Xlib`, and basic C/C++ libraries are required.
 
