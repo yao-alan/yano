@@ -50,7 +50,8 @@ namespace yano
 
             glyphProperties                        m_glyph_properties;
 
-            void keyHandler(xcb_keycode_t keycode);
+            void keyHandler(xcb_keycode_t keycode,
+                            uint32_t     *modifiers);
 
             void drawGlyph(int row, int col, int scale, uint8_t keycode) {
                 int xoffset = scale * col * m_glyph_properties.global_bbox_w;
@@ -69,9 +70,9 @@ namespace yano
                         if (bitline[c] == '1') {
                             for (int i = 0; i < scale; ++i) {
                                 for (int j = 0; j < scale; ++j) {
-                                    m_window->drawable[p+j*dp+0] = 244; // red
-                                    m_window->drawable[p+j*dp+1] = 239; // green
-                                    m_window->drawable[p+j*dp+2] = 236; // blue
+                                    m_window->drawable[p+j*dp+0] = 172; //244; // red
+                                    m_window->drawable[p+j*dp+1] = 129; //239; // green
+                                    m_window->drawable[p+j*dp+2] = 94; //236; // blue
                                 }
                                 p += m_window->window_width*dp;
                             }
@@ -233,8 +234,9 @@ yano::Yano::run() {
 
     while (!m_window->shouldClose()) {
         xcb_keycode_t keycode;
-        m_window->pollEvents(&keycode);
-        keyHandler(keycode);
+        uint32_t modifiers[4] = {0, 0, 0, 0}; // SHIFT, LOCK, CTRL, ALT
+        m_window->pollEvents(&keycode, modifiers);
+        keyHandler(keycode, modifiers);
 
         // draw cursor
         //drawGlyph(m_text_buffer.m_cursor_position.row_coord,
@@ -252,7 +254,7 @@ yano::Yano::run() {
 }
 
 void
-yano::Yano::keyHandler(xcb_keycode_t keycode) {
+yano::Yano::keyHandler(xcb_keycode_t keycode, uint32_t *modifiers) {
     switch (keycode) {
         case 0: break;
         // backspace
@@ -265,7 +267,7 @@ yano::Yano::keyHandler(xcb_keycode_t keycode) {
             break;
         }
         default: {
-            char ascii_char = m_keycode_table->convert(keycode, 0);
+            char ascii_char = m_keycode_table->convert(keycode, modifiers[0] & 1);
             m_text_buffer.addChar(ascii_char);
             drawGlyph(m_text_buffer.m_cursor_position.row_coord,
                       m_text_buffer.m_cursor_position.col_coord,

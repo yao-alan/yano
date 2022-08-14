@@ -38,7 +38,8 @@ namespace pw
 
             // event functions
             bool shouldClose();
-            void pollEvents(xcb_keycode_t *keycode);
+            void pollEvents(xcb_keycode_t *keycode,
+                            uint32_t      *modifiers);
 
             void display(int16_t x,
                          int16_t y,
@@ -216,7 +217,7 @@ pw::Window::shouldClose()
 }
 
 void 
-pw::Window::pollEvents(xcb_keycode_t *keycode)
+pw::Window::pollEvents(xcb_keycode_t *keycode, uint32_t *modifiers)
 {
     xcb_generic_event_t *event = xcb_poll_for_event(m_connection);
     if (event == NULL) return;
@@ -236,6 +237,9 @@ pw::Window::pollEvents(xcb_keycode_t *keycode)
                 m_should_close = true;
             } else {
                 *keycode = kp->detail;
+                for (int i = 0; kp->state != 0; kp->state >>= 1, ++i) {
+                    modifiers[i] = kp->state & 1;
+                }
             }
             break;
         }
